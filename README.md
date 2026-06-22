@@ -6,7 +6,7 @@ By running this script locally, all premium features are unlocked for offline an
 
 ---
 
-## 🔑 Premium Features Unlocked
+##  Premium Features Unlocked
 
 * **Unlimited Commit Graph**: Full visual history and branch visualizer without repository limits.
 * **Visual File History**: Easily view diffs, authorship, and file changes visually across time.
@@ -17,7 +17,7 @@ By running this script locally, all premium features are unlocked for offline an
 
 ---
 
-## 🚀 How to Build & Install Locally
+##  How to Build & Install Locally
 
 You can download, patch, and package GitLens entirely on your own machine in a few simple steps.
 
