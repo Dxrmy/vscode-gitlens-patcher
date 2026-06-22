@@ -4,9 +4,7 @@ A lightweight utility script that applies a runtime license bypass, overrides AP
 
 By running this script locally, all premium features are unlocked for offline and firewalled use without requiring internet connection or licensing gates.
 
----
-
-##  Premium Features Unlocked
+## Premium Features Unlocked
 
 * **Unlimited Commit Graph**: Full visual history and branch visualizer without repository limits.
 * **Visual File History**: Easily view diffs, authorship, and file changes visually across time.
@@ -15,9 +13,7 @@ By running this script locally, all premium features are unlocked for offline an
 * **Visual Branch & Tag Comparison**: Interactively inspect differences between commits, branches, or stashes.
 * **Commit Composer & Review**: Write structured commits and perform reviews locally.
 
----
-
-##  How to Build & Install Locally
+## How to Build & Install Locally
 
 You can download, patch, and package GitLens entirely on your own machine in a few simple steps.
 
