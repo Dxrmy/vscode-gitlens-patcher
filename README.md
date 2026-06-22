@@ -2,7 +2,18 @@
 
 A lightweight utility script that applies a runtime license bypass, overrides API verification calls, and mocks authentication checks for the GitLens extension. 
 
-By running this script locally, all premium features (such as the visual Commit Graph, Worktrees, and Visual File History) are unlocked for offline and firewalled use without requiring internet connection or licensing gates.
+By running this script locally, all premium features are unlocked for offline and firewalled use without requiring internet connection or licensing gates.
+
+---
+
+## 🔑 Premium Features Unlocked
+
+* **Unlimited Commit Graph**: Full visual history and branch visualizer without repository limits.
+* **Visual File History**: Easily view diffs, authorship, and file changes visually across time.
+* **Worktrees Management**: Create, switch, and maintain multiple Git worktrees concurrently.
+* **Focus View & Launchpad**: A centralized dashboard view aggregating pull requests, issues, and active tasks.
+* **Visual Branch & Tag Comparison**: Interactively inspect differences between commits, branches, or stashes.
+* **Commit Composer & Review**: Write structured commits and perform reviews locally.
 
 ---
 
