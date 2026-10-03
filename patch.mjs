@@ -28,7 +28,6 @@ function replaceInFile(filePath, replacements) {
 
 const rootDir = process.cwd();
 
-// 1. Patch src/plus/gk/utils/subscription.utils.ts
 const subUtilsPath = path.join(rootDir, 'src/plus/gk/utils/subscription.utils.ts');
 if (fs.existsSync(subUtilsPath)) {
 	let content = fs.readFileSync(subUtilsPath, 'utf8');
@@ -79,7 +78,6 @@ export function computeSubscriptionState(_subscription: Optional<Subscription, '
 	fs.writeFileSync(subUtilsPath, content, 'utf8');
 }
 
-// 2. Patch src/plus/gk/subscriptionService.ts
 const subServicePath = path.join(rootDir, 'src/plus/gk/subscriptionService.ts');
 if (fs.existsSync(subServicePath)) {
 	let content = fs.readFileSync(subServicePath, 'utf8');
@@ -107,7 +105,6 @@ $1subscription ??= {`,
 	}
 }
 
-// 3. Patch src/env/node/fetch.ts
 replaceInFile(path.join(rootDir, 'src/env/node/fetch.ts'), [
 	{
 		description: 'Export Response/Headers values',
@@ -127,7 +124,6 @@ export type FetchResponse = Response;`,
 	},
 ]);
 
-// 4. Patch src/env/browser/fetch.ts
 replaceInFile(path.join(rootDir, 'src/env/browser/fetch.ts'), [
 	{
 		description: 'Export Response/Headers values and Types',
@@ -147,7 +143,6 @@ export type FetchResponse = Response;`,
 	},
 ]);
 
-// 5. Patch src/plus/gk/serverConnection.ts
 const serverConnPath = path.join(rootDir, 'src/plus/gk/serverConnection.ts');
 if (fs.existsSync(serverConnPath)) {
 	let serverConnContent = fs.readFileSync(serverConnPath, 'utf8');
@@ -250,7 +245,6 @@ const Response = globalThis.Response;`;
 	}
 }
 
-// 6. Overwrite src/plus/gk/utils/-webview/acount.utils.ts
 const accountUtilsPath = path.join(rootDir, 'src/plus/gk/utils/-webview/acount.utils.ts');
 if (fs.existsSync(accountUtilsPath)) {
 	const stubContent = `import type { Uri } from 'vscode';
@@ -289,7 +283,6 @@ export async function ensureFeatureAccess(
 	console.log(`[OK] Overwritten: acount.utils.ts with stubs`);
 }
 
-// 7. Cleanup Documentation & Licenses
 const filesToDelete = ['CODE_OF_CONDUCT.md', 'CONTRIBUTING.md', 'LICENSE.plus', 'BACKERS.md'];
 
 for (const file of filesToDelete) {
