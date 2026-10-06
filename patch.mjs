@@ -11,13 +11,22 @@ function replaceInFile(filePath, replacements) {
 	let originalContent = content;
 
 	for (const { search, replace, description } of replacements) {
-		if (content.includes(search)) {
-			content = content.replace(search, replace);
-			console.log(`[OK] Applied: ${description} in ${path.basename(filePath)}`);
-		} else if (content.includes(replace)) {
-			console.log(`[SKIP] Already applied: ${description} in ${path.basename(filePath)}`);
-		} else {
-			console.warn(`[WARN] Search text not found for: ${description} in ${path.basename(filePath)}`);
+		if (typeof search === 'string') {
+			if (content.includes(search)) {
+				content = content.replace(search, replace);
+				console.log(`[OK] Applied: ${description} in ${path.basename(filePath)}`);
+			} else if (content.includes(replace)) {
+				console.log(`[SKIP] Already applied: ${description} in ${path.basename(filePath)}`);
+			} else {
+				console.warn(`[WARN] Search text not found for: ${description} in ${path.basename(filePath)}`);
+			}
+		} else if (search instanceof RegExp) {
+			if (search.test(content)) {
+				content = content.replace(search, replace);
+				console.log(`[OK] Applied: ${description} in ${path.basename(filePath)}`);
+			} else {
+				console.log(`[SKIP] Pattern already applied or not found for: ${description} in ${path.basename(filePath)}`);
+			}
 		}
 	}
 
@@ -28,6 +37,7 @@ function replaceInFile(filePath, replacements) {
 
 const rootDir = process.cwd();
 
+// 1. Patch subscription.utils.ts
 const subUtilsPath = path.join(rootDir, 'src/plus/gk/utils/subscription.utils.ts');
 if (fs.existsSync(subUtilsPath)) {
 	let content = fs.readFileSync(subUtilsPath, 'utf8');
@@ -67,17 +77,51 @@ export function computeSubscriptionState(_subscription: Optional<Subscription, '
 		console.log(`[OK] Applied: isSubscriptionPaidPlan patch`);
 	}
 
-	// Replace getCommunitySubscription details
-	if (content.includes("id: 'free-enterprise-user',")) {
-		content = content
-			.replace("name: 'Free Enterprise',", "name: 'Local Enterprise',")
-			.replace("email: 'unlocked@example.com',", "email: 'unlocked@gitlens.local',");
-		console.log(`[OK] Applied: getCommunitySubscription details update`);
+	// Bypass account access requirements
+	const isAccountReqRegex =
+		/export function isAccountAccessRequired\(subscription: Subscription\): boolean\s*\{[\s\S]*?\}/;
+	if (isAccountReqRegex.test(content)) {
+		content = content.replace(
+			isAccountReqRegex,
+			`export function isAccountAccessRequired(_subscription: Subscription): boolean {
+	return false;
+}`,
+		);
+		console.log(`[OK] Applied: isAccountAccessRequired patch`);
+	}
+
+	// Replace getCommunitySubscription details with Enterprise plan
+	const getCommunityRegex =
+		/export function getCommunitySubscription\(subscription\?: Subscription\): Subscription\s*\{[\s\S]*?\n\}/;
+	if (getCommunityRegex.test(content)) {
+		content = content.replace(
+			getCommunityRegex,
+			`export function getCommunitySubscription(subscription?: Subscription): Subscription {
+	return {
+		...subscription,
+		plan: {
+			actual: getSubscriptionPlan('enterprise', false, 0, undefined),
+			effective: getSubscriptionPlan('enterprise', false, 0, undefined),
+		},
+		account: {
+			id: 'free-enterprise-user',
+			name: 'Local Enterprise',
+			email: 'unlocked@gitlens.local',
+			verified: true,
+			createdOn: new Date().toISOString(),
+		},
+		activeOrganization: undefined,
+		state: SubscriptionState.Paid,
+	};
+}`,
+		);
+		console.log(`[OK] Applied: getCommunitySubscription Enterprise override`);
 	}
 
 	fs.writeFileSync(subUtilsPath, content, 'utf8');
 }
 
+// 2. Patch subscriptionService.ts
 const subServicePath = path.join(rootDir, 'src/plus/gk/subscriptionService.ts');
 if (fs.existsSync(subServicePath)) {
 	let content = fs.readFileSync(subServicePath, 'utf8');
@@ -86,15 +130,7 @@ if (fs.existsSync(subServicePath)) {
 		content = content.replace(
 			forceEntRegex,
 			`$1// FORCE ENTERPRISE
-$1if (subscription?.account == null || subscription.account.id === 'free-enterprise-user') {
-$1    subscription = getCommunitySubscription(undefined);
-$1} else {
-$1    (subscription as Mutable<Subscription>).plan = {
-$1        actual: getSubscriptionPlan('enterprise', false, 0, undefined),
-$1        effective: getSubscriptionPlan('enterprise', false, 0, undefined),
-$1    };
-$1    subscription.state = SubscriptionState.Paid;
-$1}
+$1subscription = getCommunitySubscription(subscription as Subscription | undefined);
 $1
 $1subscription ??= {`,
 		);
@@ -105,44 +141,55 @@ $1subscription ??= {`,
 	}
 }
 
-replaceInFile(path.join(rootDir, 'src/env/node/fetch.ts'), [
-	{
-		description: 'Export Response/Headers values',
-		search: `import fetch from 'node-fetch';`,
-		replace: `import fetch, { Headers, Request, Response } from 'node-fetch';`,
-	},
-	{
-		description: 'Export Response/Headers values (export)',
-		search: `export { fetch };`,
-		replace: `export { fetch, Headers, Request, Response };
-export type FetchResponse = Response;`,
-	},
-	{
-		description: 'Remove Response from type export',
-		search: `export type { BodyInit, HeadersInit, RequestInfo, RequestInit, Response } from 'node-fetch';`,
-		replace: `export type { BodyInit, HeadersInit, RequestInfo, RequestInit, Response } from 'node-fetch';`,
-	},
-]);
+// 3. Patch src/env/node/fetch.ts (support both modern globalThis.fetch and legacy node-fetch)
+const nodeFetchPath = path.join(rootDir, 'src/env/node/fetch.ts');
+if (fs.existsSync(nodeFetchPath)) {
+	let content = fs.readFileSync(nodeFetchPath, 'utf8');
+	if (content.includes(`import fetch from 'node-fetch';`)) {
+		content = content
+			.replace(`import fetch from 'node-fetch';`, `import fetch, { Headers, Request, Response } from 'node-fetch';`)
+			.replace(`export { fetch };`, `export { fetch, Headers, Request, Response };\nexport type FetchResponse = Response;`);
+		fs.writeFileSync(nodeFetchPath, content, 'utf8');
+		console.log(`[OK] Applied: node-fetch exports in src/env/node/fetch.ts`);
+	} else if (content.includes(`const fetch = globalThis.fetch;`)) {
+		content = content
+			.replace(
+				`const fetch = globalThis.fetch;`,
+				`const { fetch, Headers, Request, Response } = globalThis;`,
+			)
+			.replace(
+				`export { fetch };`,
+				`export { fetch, Headers, Request, Response };\nexport type FetchResponse = Response;`,
+			);
+		fs.writeFileSync(nodeFetchPath, content, 'utf8');
+		console.log(`[OK] Applied: globalThis fetch exports in src/env/node/fetch.ts`);
+	} else {
+		console.log(`[SKIP] src/env/node/fetch.ts already updated or unrecognized format`);
+	}
+}
 
-replaceInFile(path.join(rootDir, 'src/env/browser/fetch.ts'), [
-	{
-		description: 'Export Response/Headers values and Types',
-		search: `const fetch = globalThis.fetch;
-export { fetch, fetch as insecureFetch };`,
-		replace: `const { fetch, Response, Headers, Request } = globalThis;
-export { fetch, fetch as insecureFetch, Response, Headers, Request };
-export type Response = globalThis.Response;
-export type Headers = globalThis.Headers;
-export type Request = globalThis.Request;
-export type FetchResponse = Response;`,
-	},
-	{
-		description: 'Remove Response from type export (fix duplicate)',
-		search: `	_Response as Response,`,
-		replace: ``,
-	},
-]);
+// 4. Patch src/env/browser/fetch.ts
+const browserFetchPath = path.join(rootDir, 'src/env/browser/fetch.ts');
+if (fs.existsSync(browserFetchPath)) {
+	let content = fs.readFileSync(browserFetchPath, 'utf8');
+	if (content.includes(`const fetch = globalThis.fetch;`)) {
+		content = content
+			.replace(
+				`const fetch = globalThis.fetch;`,
+				`const { fetch, Response, Headers, Request } = globalThis;\nexport type Response = globalThis.Response;\nexport type Headers = globalThis.Headers;\nexport type Request = globalThis.Request;\nexport type FetchResponse = Response;`,
+			)
+			.replace(
+				/export\s*\{\s*fetch(?:,\s*fetch\s+as\s+insecureFetch)?\s*\};/,
+				`export { fetch, fetch as insecureFetch, Response, Headers, Request };`,
+			);
+		fs.writeFileSync(browserFetchPath, content, 'utf8');
+		console.log(`[OK] Applied: fetch exports in src/env/browser/fetch.ts`);
+	} else {
+		console.log(`[SKIP] src/env/browser/fetch.ts already updated or unrecognized format`);
+	}
+}
 
+// 5. Patch src/plus/gk/serverConnection.ts
 const serverConnPath = path.join(rootDir, 'src/plus/gk/serverConnection.ts');
 if (fs.existsSync(serverConnPath)) {
 	let serverConnContent = fs.readFileSync(serverConnPath, 'utf8');
@@ -172,7 +219,6 @@ if (fs.existsSync(serverConnPath)) {
 
 		const importMark = `import { fetch as _fetch } from '@env/fetch.js';`;
 		const cleanImports = `import { fetch as _fetch } from '@env/fetch.js';
-import type { FetchResponse } from '@env/fetch.js';
 const FetchHeaders = globalThis.Headers;
 const Response = globalThis.Response;`;
 
@@ -245,9 +291,16 @@ const Response = globalThis.Response;`;
 	}
 }
 
-const accountUtilsPath = path.join(rootDir, 'src/plus/gk/utils/-webview/acount.utils.ts');
-if (fs.existsSync(accountUtilsPath)) {
-	const stubContent = `import type { Uri } from 'vscode';
+// 6. Overwrite acount.utils.ts / account.utils.ts with stubs
+const accountUtilsPaths = [
+	path.join(rootDir, 'src/plus/gk/utils/-webview/acount.utils.ts'),
+	path.join(rootDir, 'src/plus/gk/utils/-webview/account.utils.ts'),
+];
+
+for (const accountUtilsPath of accountUtilsPaths) {
+	if (fs.existsSync(accountUtilsPath)) {
+		const stubContent = `/* eslint-disable */
+import type { Uri } from 'vscode';
 import type { Source } from '../../../../constants.telemetry.js';
 import type { Container } from '../../../../container.js';
 import type { PlusFeatures } from '../../../../features.js';
@@ -279,11 +332,13 @@ export async function ensureFeatureAccess(
 	return true;
 }
 `;
-	fs.writeFileSync(accountUtilsPath, stubContent, 'utf8');
-	console.log(`[OK] Overwritten: acount.utils.ts with stubs`);
+		fs.writeFileSync(accountUtilsPath, stubContent, 'utf8');
+		console.log(`[OK] Overwritten: ${path.basename(accountUtilsPath)} with stubs`);
+	}
 }
 
-const filesToDelete = ['CODE_OF_CONDUCT.md', 'CONTRIBUTING.md', 'LICENSE.plus', 'BACKERS.md'];
+// 7. Cleanup non-essential documentation (NOTE: LICENSE.plus is retained as it is required by the build system)
+const filesToDelete = ['CODE_OF_CONDUCT.md', 'CONTRIBUTING.md', 'BACKERS.md'];
 
 for (const file of filesToDelete) {
 	const filePath = path.join(rootDir, file);
