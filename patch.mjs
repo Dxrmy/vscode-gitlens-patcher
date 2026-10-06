@@ -129,7 +129,7 @@ if (fs.existsSync(subServicePath)) {
 	if (forceEntRegex.test(content)) {
 		content = content.replace(
 			forceEntRegex,
-			`$1// FORCE ENTERPRISE
+			`$1// Enterprise override
 $1subscription = getCommunitySubscription(subscription as Subscription | undefined);
 $1
 $1subscription ??= {`,
@@ -231,7 +231,7 @@ const Response = globalThis.Response;`;
 			);`;
 
 		const injectionCode = `
-            // Mock checkin interception
+            // Mock interception
             if (typeof url === 'string' && (url.includes('gitlens/checkin') || url.includes('/user/checkin'))) {
                 const mockResponse = {
                     user: {
